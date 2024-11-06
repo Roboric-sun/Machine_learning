@@ -1,0 +1,113 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import GridSearchCV
+from sklearn import metrics
+
+# Загрузка данных
+df = pd.read_csv('bank.csv')
+
+# Обзор данных
+print(df.shape)        # Размер набора данных
+print(df.columns)      # Названия столбцов
+print(df.head())       # Первые несколько строк
+print(df.info())       # Информация о признаках
+
+# Описательная статистика числовых признаков
+print(df.describe())
+
+# Корреляционная матрица для числовых признаков
+plt.figure(figsize=(12, 8))
+numerical_df = df.select_dtypes(include=[np.number])  # Выбор только числовых данных
+sns.heatmap(numerical_df.corr(), annot=True, cmap='coolwarm')
+plt.title('Корреляционная матрица')
+plt.show()
+
+# Визуализация распределения целевой переменной
+if 'balance' in df.columns:
+    plt.figure(figsize=(8, 4))
+    sns.countplot(data=df, x='balance')
+    plt.title('Распределение целевой переменной')
+    plt.show()
+
+# Обработка пропусков (если есть)
+missing_info = df.isnull().sum()
+print("\nПропуски в данных:\n", missing_info)
+
+# Заполнение пропусков для числовых столбцов медианой
+numerical_columns = df.select_dtypes(include=[np.number]).columns
+df[numerical_columns] = df[numerical_columns].fillna(df[numerical_columns].median())
+
+# Заполнение пропусков для категориальных столбцов наиболее частым значением
+categorical_columns = df.select_dtypes(include=[object]).columns
+for column in categorical_columns:
+    df[column] = df[column].fillna(df[column].mode()[0])
+
+# Проверка, что пропуски устранены
+print("\nПропуски после обработки:\n", df.isnull().sum().sum())
+
+# Кодирование категориальных переменных
+df = pd.get_dummies(df, drop_first=True)
+
+# Масштабирование признаков
+scaler = StandardScaler()
+df_normalized = pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
+
+# Определение признаков и целевой переменной
+if 'balance' in df.columns:
+    X = df_normalized.drop(columns=['balance'])  # Признаки
+    y = df['balance']                            # Целевая переменная
+
+    # Разделение данных на обучающую и тестовую выборки
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+
+    # Модель K ближайших соседей с n_neighbors=4
+    model_4 = KNeighborsClassifier(n_neighbors=4)
+    model_4.fit(X_train, y_train)
+    y_train_pred_4 = model_4.predict(X_train)
+    y_test_pred_4 = model_4.predict(X_test)
+
+    # Оценка точности для первой модели
+    train_accuracy_4 = accuracy_score(y_train, y_train_pred_4)
+    test_accuracy_4 = accuracy_score(y_test, y_test_pred_4)
+    print(f'KNN с n_neighbors=4:\nОбучающая точность: {train_accuracy_4:.4f}, Тестовая точность: {test_accuracy_4:.4f}')
+
+    # Отчет о классификации для первой модели
+    
+
+    # Матрица ошибок для первой модели
+    confusion_matrix_4 = confusion_matrix(y_test, y_test_pred_4)
+    confusion_matrix_display_4 = metrics.ConfusionMatrixDisplay(confusion_matrix=confusion_matrix_4, display_labels=model_4.classes_)
+    confusion_matrix_display_4.plot()
+    plt.title('Матрица ошибок KNN (n_neighbors=4)')
+    plt.show()
+
+    # Вторая модель K ближайших соседей с n_neighbors=8
+    model_8 = KNeighborsClassifier(n_neighbors=8)
+    model_8.fit(X_train, y_train)
+    y_train_pred_8 = model_8.predict(X_train)
+    y_test_pred_8 = model_8.predict(X_test)
+
+    # Оценка точности для второй модели
+    train_accuracy_8 = accuracy_score(y_train, y_train_pred_8)
+    test_accuracy_8 = accuracy_score(y_test, y_test_pred_8)
+    print(f'KNN с n_neighbors=8:\nОбучающая точность: {train_accuracy_8:.4f}, Тестовая точность: {test_accuracy_8:.4f}')
+
+    # Отчет о классификации для второй модели
+   
+
+    # Матрица ошибок для второй модели
+    confusion_matrix_8 = confusion_matrix(y_test, y_test_pred_8)
+    confusion_matrix_display_8 = metrics.ConfusionMatrixDisplay(confusion_matrix=confusion_matrix_8, display_labels=model_8.classes_)
+    confusion_matrix_display_8.plot()
+    plt.title('Матрица ошибок KNN (n_neighbors=8)')
+    plt.show()
+
+else:
+    print("Целевая переменная 'balance' не найдена в данных.")
