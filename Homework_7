@@ -1,0 +1,164 @@
+# Импортируем необходимые библиотеки
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.cluster import KMeans, DBSCAN
+from sklearn.metrics import silhouette_score
+
+# Загрузка данных
+file_path = '/content/sample_data/bank.csv'  # Путь к файлу, загруженному в Google Colab
+df = pd.read_csv(file_path)
+
+# 0. Описываем задачу
+# Данные касаются клиентов банка. Цель — предсказать, подпишется ли клиент на депозит.
+
+# 1. Прочитать данные
+# Мы уже загрузили данные с помощью pd.read_csv(file_path).
+
+# 2. Визуализировать данные и вычислить основные характеристики
+# Основная статистика
+print(df.describe())
+
+# Выбираем только числовые столбцы для корреляционной матрицы
+numeric_df = df.select_dtypes(include=['float64', 'int64'])
+
+# Строим корреляционную матрицу
+correlation_matrix = numeric_df.corr()
+
+# Визуализируем корреляционную матрицу
+plt.figure(figsize=(10, 6))
+plt.title('Correlation Matrix')
+plt.matshow(correlation_matrix, cmap='coolwarm', fignum=1)
+plt.colorbar()
+plt.show()
+
+
+# 3. Обработать пропущенные значения
+missing_values = df.isnull().sum()
+print(f"Пропущенные значения: \n{missing_values}")
+
+# 4. Обработать категориальные признаки
+df_encoded = pd.get_dummies(df, drop_first=True)  # Применяем one-hot кодирование
+
+# 5. Нормализация
+scaler = StandardScaler()
+numeric_columns = df_encoded.select_dtypes(include=['float64', 'int64']).columns
+df_encoded[numeric_columns] = scaler.fit_transform(df_encoded[numeric_columns])
+
+# 6. Разбиение данных на обучающую и тестовую выборки
+X = df_encoded.drop('deposit_yes', axis=1)
+y = df_encoded['deposit_yes']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# 7. Запускаем классификатор KNN
+knn = KNeighborsClassifier(n_neighbors=5)
+knn.fit(X_train, y_train)
+
+# Прогнозируем на обучающей и тестовой выборках
+y_train_pred = knn.predict(X_train)
+y_test_pred = knn.predict(X_test)
+
+# Вычисляем точность
+train_accuracy = accuracy_score(y_train, y_train_pred)
+test_accuracy = accuracy_score(y_test, y_test_pred)
+
+print(f"Точность на обучающей выборке: {train_accuracy}")
+print(f"Точность на тестовой выборке: {test_accuracy}")
+
+# 8. Подбор оптимального значения гиперпараметра k
+k_values = range(1, 21)
+train_accuracies = []
+test_accuracies = []
+
+for k in k_values:
+    knn = KNeighborsClassifier(n_neighbors=k)
+    knn.fit(X_train, y_train)
+    y_train_pred = knn.predict(X_train)
+    y_test_pred = knn.predict(X_test)
+    
+    train_accuracies.append(accuracy_score(y_train, y_train_pred))
+    test_accuracies.append(accuracy_score(y_test, y_test_pred))
+
+# Найдем оптимальное значение k
+best_k = k_values[test_accuracies.index(max(test_accuracies))]
+
+# Визуализируем результаты
+plt.plot(k_values, train_accuracies, label='Обучающая выборка')
+plt.plot(k_values, test_accuracies, label='Тестовая выборка')
+plt.xlabel('Количество соседей (k)')
+plt.ylabel('Точность')
+plt.title('Точность классификатора в зависимости от количества соседей')
+plt.legend()
+plt.show()
+
+print(f"Оптимальное значение k: {best_k}")
+print(f"Максимальная точность на тестовой выборке: {max(test_accuracies)}")
+
+# 9. Запуск других классификаторов (по желанию)
+# Логистическая регрессия
+log_reg = LogisticRegression(max_iter=1000)
+log_reg.fit(X_train, y_train)
+log_reg_train_pred = log_reg.predict(X_train)
+log_reg_test_pred = log_reg.predict(X_test)
+
+log_reg_train_accuracy = accuracy_score(y_train, log_reg_train_pred)
+log_reg_test_accuracy = accuracy_score(y_test, log_reg_test_pred)
+
+# Случайный лес
+rf = RandomForestClassifier(random_state=42)
+rf.fit(X_train, y_train)
+rf_train_pred = rf.predict(X_train)
+rf_test_pred = rf.predict(X_test)
+
+rf_train_accuracy = accuracy_score(y_train, rf_train_pred)
+rf_test_accuracy = accuracy_score(y_test, rf_test_pred)
+
+print(f"Точность Логистической регрессии на тестовой выборке: {log_reg_test_accuracy}")
+print(f"Точность Случайного леса на тестовой выборке: {rf_test_accuracy}")
+
+# 10. Работа с несбалансированными классами (по желанию)
+# Мы можем использовать такие методы, как стратифицированный кросс-валидационный подбор гиперпараметров или взвешивание классов.
+# Для простоты пропустим этот шаг.
+
+# 11. Исключение коррелированных переменных (по желанию)
+# Для того, чтобы исключить коррелированные признаки, можно использовать метод отбора признаков.
+# Для начала можем просто изучить высококоррелированные признаки.
+corr_matrix = df_encoded.corr().abs()
+highly_correlated_features = set()
+
+for i in range(len(corr_matrix.columns)):
+    for j in range(i):
+        if corr_matrix.iloc[i, j] > 0.9:  # Порог для корреляции
+            colname = corr_matrix.columns[i]
+            highly_correlated_features.add(colname)
+
+print(f"Высококоррелированные признаки: {highly_correlated_features}")
+
+# 12. Кластеризация (без использования целевой метки)
+# Используем 3 метода кластеризации: KMeans, DBSCAN и AgglomerativeClustering
+# KMeans
+kmeans = KMeans(n_clusters=2, random_state=42)
+kmeans_labels = kmeans.fit_predict(X)
+
+# DBSCAN
+dbscan = DBSCAN(eps=0.5, min_samples=5)
+dbscan_labels = dbscan.fit_predict(X)
+
+# Оценим качество кластеризации с помощью silhouette_score
+kmeans_score = silhouette_score(X, kmeans_labels)
+dbscan_score = silhouette_score(X, dbscan_labels)
+
+print(f"Silhouette Score для KMeans: {kmeans_score}")
+print(f"Silhouette Score для DBSCAN: {dbscan_score}")
+
+# Сравнение кластеризации с истинными метками
+kmeans_accuracy = accuracy_score(y, kmeans_labels)
+dbscan_accuracy = accuracy_score(y, dbscan_labels)
+
+print(f"Точность KMeans на истинных метках: {kmeans_accuracy}")
+print(f"Точность DBSCAN на истинных метках: {dbscan_accuracy}")
